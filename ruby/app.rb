@@ -11,7 +11,7 @@ class SinatraApp < Sinatra::Base
   end
 
   use OmniAuth::Builder do
-    provider :github, '9c40b7f0463013a00365', 'aa60df916f5c02c9ed91d06895f53606bb07ee7e'
+    provider :github, SiteConfig['github']['client_id'], SiteConfig['github']['client_secret']
   end
 
   def request_headers
