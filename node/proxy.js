@@ -141,10 +141,11 @@ server.on('request', function (req, res) {
       // Logged in, proxy the request to the backend
       var method = req.method;
 
+      // Ignore the Host value of the proxy server and use the backend Host instead
       delete headers.host;
 
       req.pipe(request({
-        url: "http://indienews.dev" + req.url,
+        url: config.backend + req.url,
         headers: headers,
         method: method
       })).pipe(res);
