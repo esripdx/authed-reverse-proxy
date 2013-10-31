@@ -6,12 +6,7 @@ var qs = require('qs');
 var cookie = require('cookie');
 var config = require('./config.json');
 
-var server = http.createServer().listen(9394);
-
-function notFound(res) {
-  res.statusCode = 404;
-  res.end('404 Error');
-}
+var server = http.createServer().listen(config.port);
 
 function unknownError(res) {
   res.writeHead(301, {
@@ -19,6 +14,67 @@ function unknownError(res) {
     'Location': '/'
   });
   res.end();
+}
+
+function getAccessTokenFromAuthCode(auth_code, res, callback) {
+  request({
+    url: "https://github.com/login/oauth/access_token",
+    method: "POST",
+    form: {
+      client_id: config.github.client_id,
+      client_secret: config.github.client_secret,
+      code: auth_code
+    }
+  }, function(error, response, body){
+    if(!error && body) {
+      var token_response = qs.parse(body);
+      if(token_response && token_response.access_token) {
+        callback(token_response.access_token);
+      } else {
+        unknownError(res);
+      }
+    } else {
+      unknownError(res);
+    }
+  });
+}
+
+function getUsername(access_token, res, callback) {
+  // Check the orgs the user is a member of
+  request({
+    url: "https://api.github.com/user",
+    headers: {
+      'Authorization': 'Bearer '+access_token
+    }
+  }, function(error, response, body){
+    if(!error && body) {
+      var userInfo = JSON.parse(body);
+      if(userInfo && userInfo.login) {
+        callback(userInfo.login);
+      } else {
+        unknownError(res);
+      }
+    } else {
+      unknownError(res);
+    }
+  });
+}
+
+function getOrgsForUser(access_token, res, callback) {
+  // Check the orgs the user is a member of
+  request({
+    url: "https://api.github.com/user/orgs",
+    headers: {
+      'Authorization': 'Bearer '+access_token
+    }
+  }, function(error, response, body){
+    if(!error && body) {
+      var orgs = JSON.parse(body);
+      callback(orgs);
+    } else {
+      unknownError(res);
+    }
+  });
 }
 
 server.on('request', function (req, res) {
@@ -29,86 +85,53 @@ server.on('request', function (req, res) {
     if(u.query && u.query.code) {
       // Auth callback from Github
 
-      // Get an access token from Github
-      request({
-        url: "https://github.com/login/oauth/access_token",
-        method: "POST",
-        form: {
-          client_id: config.github.client_id,
-          client_secret: config.github.client_secret,
-          code: u.query.code
-        }
-      }, function(error, response, body){
+      getAccessTokenFromAuthCode(u.query.code, res, function(access_token) {
+        getOrgsForUser(access_token, res, function(orgs) {
+          if(orgs && orgs.length) {
 
-        if(!error && body) {
+            var org_ids = orgs.map(function(o) { return o.login });
 
-          var token_response = qs.parse(body);
+            var authorized_org = false;
+            console.log(config.orgs);
 
-          if(token_response && token_response.access_token) {
-
-            // Check the orgs the user is a member of
-            request({
-              url: "https://api.github.com/user/orgs",
-              headers: {
-                'Authorization': 'Bearer '+token_response.access_token
+            config.orgs.forEach(function(o){
+              console.log(o);
+              if(org_ids.indexOf(o)) {
+                authorized_org = o;
               }
-            }, function(error, response, body){
+            })
 
-              if(!error && body) {
-                var orgs = JSON.parse(body);
+            if(authorized_org) {
 
-                if(orgs && orgs.length) {
+              getUsername(access_token, res, function(username) {
 
-                  var org_ids = orgs.map(function(o) { return o.login });
-
-                  var authorized_org = false;
-                  console.log(config.orgs);
-
-                  config.orgs.forEach(function(o){
-                    console.log(o);
-                    if(org_ids.indexOf(o)) {
-                      authorized_org = o;
-                    }
-                  })
-
-                  if(authorized_org) {
-
-                    var session = {
-                      authorized: true,
-                      timestamp: new Date().getTime(),
-                      org: authorized_org
-                    }
-                    console.log("User signed in");
-                    console.log(session);
-                    var token = jwt.encode(session, config.session_secret);
-
-                    res.writeHead(301, {
-                      'Set-Cookie': 'proxy.auth='+token,
-                      'Location': '/'
-                    });
-                    res.end();
-
-                  } else {
-                    unknownError(res);
-                  }
-
-                } else {
-                  unknownError(res);
+                var session = {
+                  authorized: true,
+                  timestamp: new Date().getTime(),
+                  org: authorized_org,
+                  username: username
                 }
+                console.log("User signed in");
+                console.log(session);
+                var token = jwt.encode(session, config.session_secret);
 
-              } else {
-                unknownError(res);
-              }
-            });
+                res.writeHead(301, {
+                  'Set-Cookie': 'proxy.auth='+token,
+                  'Location': '/'
+                });
+                res.end();
+
+              });
+
+            } else {
+              unknownError(res);
+            }
 
           } else {
             unknownError(res);
           }
 
-        } else {
-          unknownError(res);
-        }
-
+        })
       });
 
     } else if(u.query && u.query.start) {
@@ -130,11 +153,12 @@ server.on('request', function (req, res) {
     var cookies = cookie.parse(headers['cookie']);
     var authenticated = false;
 
+    var session = null;
     if(cookies['proxy.auth']) {
-      var token = jwt.decode(cookies['proxy.auth'], config.session_secret);
-      console.log("0-0");
-      console.log(token);
-      authenticated = true;
+      session = jwt.decode(cookies['proxy.auth'], config.session_secret);
+      if(session.username) {
+        authenticated = true;
+      }
     }
 
     if(authenticated) {
@@ -143,6 +167,10 @@ server.on('request', function (req, res) {
 
       // Ignore the Host value of the proxy server and use the backend Host instead
       delete headers.host;
+
+      // Include the username in the headers
+      headers['X-Proxy-Username'] = session.username;
+      headers['X-Proxy-Org'] = session.org;
 
       req.pipe(request({
         url: config.backend + req.url,
