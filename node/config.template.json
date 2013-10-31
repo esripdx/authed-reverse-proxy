@@ -1,0 +1,10 @@
+{
+  "orgs": [
+    "Esri"
+  ],
+  "github": {
+    "client_id": "",
+    "client_secret": ""
+  },
+  "session_secret": "super-sekret"
+}
