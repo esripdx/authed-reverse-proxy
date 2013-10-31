@@ -1,0 +1,6 @@
+github_orgs:
+  - Esri
+backend: "http://example.com"
+github:
+  client_id: 
+  client_secret: 
