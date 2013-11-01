@@ -15,10 +15,26 @@ class SinatraApp < Sinatra::Base
   end
 
   def request_headers
-    env.select {|k,v| k.start_with? 'HTTP_'}
-      .collect {|pair| [pair[0].sub(/^HTTP_/, ''), pair[1]]}
-      .collect {|pair| pair.join(": ") << "\n"}
-      .sort
+    request.env.keys.select {|k,v| k.start_with? 'HTTP_'}.reduce({}) do |h,k|
+      key = k.sub /^HTTP_/, ''
+      key.downcase!
+      key.gsub!(/(^|_)[a-z]/){|m| m.upcase}
+      key.gsub! '_', '-'
+      h[key] = request.env[k]
+      h
+    end
+  end
+
+  def unchunk hash = {}
+    hash.select {|k,v| nil if k == 'Transfer-Encoding' && v == 'chunked' }.compact
+  end
+
+  def proxy method, path, _params = params, headers = request_headers
+    ps = _params.empty? ? nil : _params
+    r = @@hc.__send__ method, path, ps, request_headers
+    status r.status
+    headers unchunk(r.headers)
+    r.body
   end
 
   get /^(?!\/auth)/ do
@@ -28,16 +44,7 @@ class SinatraApp < Sinatra::Base
       HTML
     else
       # Proxy to backend
-      puts request_headers
-      path = SiteConfig['backend'] + request.path
-      puts path
-      puts params.inspect
-
-      r = @@hc.get path, (params.empty? ? nil : params), request_headers
-      status r.status
-      headers r.headers
-      puts r.headers.inspect
-      r.body
+      proxy :get, SiteConfig['backend'] + request.path
     end
   end
 
@@ -48,7 +55,7 @@ class SinatraApp < Sinatra::Base
       HTML
     else
       # Proxy to backend
-      r = @@hc.post SiteConfig['backend'] + request.path, request.querystring
+      proxy :post, SiteConfig['backend'] + request.path + '?' + request.query_string
     end
   end
 
