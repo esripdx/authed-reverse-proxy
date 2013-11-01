@@ -26,7 +26,7 @@ class SinatraApp < Sinatra::Base
   end
 
   def unchunk hash = {}
-    hash.select {|k,v| nil if k == 'Transfer-Encoding' && v == 'chunked' }.compact
+    hash.select {|k,v| !(k == 'Transfer-Encoding' && v == 'chunked') }
   end
 
   def proxy method, path, _params = params, headers = request_headers
