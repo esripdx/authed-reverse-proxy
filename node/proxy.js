@@ -148,6 +148,20 @@ server.on('request', function (req, res) {
     }
 
   } else {
+    // check for redirects
+    if (config.redirect && Object.keys(config.redirect)) {
+      var keys = Object.keys(config.redirect);
+      for (var i = 0; i < keys.length; i++) {
+        if (req.url.match(keys[i])) {
+          res.writeHead(301, {
+            'Location': config.redirect[keys[i]]
+          });
+          res.end();
+          return;
+        }
+      }
+    }
+
     var headers = req.headers;
 
     var cookies = cookie.parse(headers['cookie']);
