@@ -163,15 +163,17 @@ server.on('request', function (req, res) {
     }
 
     var headers = req.headers;
-
-    var cookies = cookie.parse(headers['cookie']);
     var authenticated = false;
 
-    var session = null;
-    if(cookies['proxy.auth']) {
-      session = jwt.decode(cookies['proxy.auth'], config.session_secret);
-      if(session.username) {
-        authenticated = true;
+    if(headers['cookie']) {
+      var cookies = cookie.parse(headers['cookie']);
+
+      var session = null;
+      if(cookies['proxy.auth']) {
+        session = jwt.decode(cookies['proxy.auth'], config.session_secret);
+        if(session.username) {
+          authenticated = true;
+        }
       }
     }
 
