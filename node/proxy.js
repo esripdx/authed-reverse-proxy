@@ -89,7 +89,7 @@ server.on('request', function (req, res) {
         getOrgsForUser(access_token, res, function(orgs) {
           if(orgs && orgs.length) {
 
-            var org_ids = orgs.map(function(o) { return o.login });
+            var org_ids = orgs.map(function(o) { return o.login; });
 
             var authorized_org = false;
             console.log(config.orgs);
@@ -99,7 +99,7 @@ server.on('request', function (req, res) {
               if(org_ids.indexOf(o)) {
                 authorized_org = o;
               }
-            })
+            });
 
             if(authorized_org) {
 
@@ -110,7 +110,7 @@ server.on('request', function (req, res) {
                   timestamp: new Date().getTime(),
                   org: authorized_org,
                   username: username
-                }
+                };
                 console.log("User signed in");
                 console.log(session);
                 var token = jwt.encode(session, config.session_secret);
@@ -131,7 +131,7 @@ server.on('request', function (req, res) {
             unknownError(res);
           }
 
-        })
+        });
       });
 
     } else if(u.query && u.query.start) {
@@ -148,6 +148,20 @@ server.on('request', function (req, res) {
     }
 
   } else {
+    // check for redirects
+    if (config.redirect && Object.keys(config.redirect)) {
+      var keys = Object.keys(config.redirect);
+      for (var i = 0; i < keys.length; i++) {
+        if (req.url.match(keys[i])) {
+          res.writeHead(301, {
+            'Location': config.redirect[keys[i]]
+          });
+          res.end();
+          return;
+        }
+      }
+    }
+
     var headers = req.headers;
 
     var cookies = cookie.parse(headers['cookie']);
@@ -180,6 +194,7 @@ server.on('request', function (req, res) {
     } else {
       // Not logged in, show the login link
       res.statusCode = 401;
+      res.setHeader("Content-Type", "text/html");
       res.end('<a href="/_auth?start=true">Sign in with Github</a>');
     }
   }

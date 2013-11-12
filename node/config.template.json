@@ -8,5 +8,8 @@
     "client_id": "",
     "client_secret": ""
   },
-  "session_secret": "super-sekret"
+  "session_secret": "super-sekret",
+  "redirect": {
+    "/from": "/to"
+  }
 }
