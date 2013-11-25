@@ -8,6 +8,8 @@ var config = require('./config.json');
 
 var server = http.createServer().listen(config.port);
 
+http.globalAgent.maxSockets = 300;
+
 function unknownError(res) {
   res.writeHead(301, {
     'Set-Cookie': 'proxy.auth=x; expires=Thu, 01 Jan 1970 00:00:00 GMT',
@@ -24,6 +26,9 @@ function getAccessTokenFromAuthCode(auth_code, res, callback) {
       client_id: config.github.client_id,
       client_secret: config.github.client_secret,
       code: auth_code
+    },
+    headers: {
+      'User-Agent': 'notes.pdx.esri.com'
     }
   }, function(error, response, body){
     if(!error && body) {
@@ -44,7 +49,8 @@ function getUsername(access_token, res, callback) {
   request({
     url: "https://api.github.com/user",
     headers: {
-      'Authorization': 'Bearer '+access_token
+      'Authorization': 'token '+access_token,
+      'User-Agent': 'notes.pdx.esri.com'
     }
   }, function(error, response, body){
     if(!error && body) {
@@ -65,12 +71,17 @@ function getOrgsForUser(access_token, res, callback) {
   request({
     url: "https://api.github.com/user/orgs",
     headers: {
-      'Authorization': 'Bearer '+access_token
+      'Authorization': 'token '+access_token,
+      'User-Agent': 'notes.pdx.esri.com'
     }
   }, function(error, response, body){
     if(!error && body) {
-      var orgs = JSON.parse(body);
-      callback(orgs);
+      try {
+        var orgs = JSON.parse(body);
+        callback(orgs);
+      } catch(e) {
+        unknownError(res);
+      }
     } else {
       unknownError(res);
     }
