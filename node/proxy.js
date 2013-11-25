@@ -54,10 +54,14 @@ function getUsername(access_token, res, callback) {
     }
   }, function(error, response, body){
     if(!error && body) {
-      var userInfo = JSON.parse(body);
-      if(userInfo && userInfo.login) {
-        callback(userInfo.login);
-      } else {
+      try {
+        var userInfo = JSON.parse(body);
+        if(userInfo && userInfo.login) {
+          callback(userInfo.login);
+        } else {
+          unknownError(res);
+        }
+      } catch(e) {
         unknownError(res);
       }
     } else {
