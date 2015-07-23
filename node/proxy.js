@@ -135,12 +135,12 @@ server.on('request', function (req, res) {
       });
 
     } else if(u.query && u.query.start) {
-      res.writeHead(301, {
-        'Location': 'https://github.com/login/oauth/authorize?client_id='+config.github.client_id
+      res.writeHead(302, {
+        'Location': 'https://github.com/login/oauth/authorize?scope=read:org&client_id='+config.github.client_id
       });
       res.end();
     } else {
-      res.writeHead(301, {
+      res.writeHead(302, {
         'Set-Cookie': 'proxy.auth=x; expires=Thu, 01 Jan 1970 00:00:00 GMT',
         'Location': '/'
       });
